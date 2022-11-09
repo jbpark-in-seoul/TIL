@@ -5,6 +5,7 @@
 * 구현된 클래스와 매핑을 해주기 위해 사용되는 프레임워크이다.
 * JPA를 구현한 대표적인 오픈소스로는 Hibernate가 있다.
 
+
 ### 사용 이유
 * SQL 중심 개발에서 객체 중심 개발이 가능하다.
 * 생산성이 증가한다.
@@ -23,24 +24,128 @@
 * 애플리케이션과 JDBC 사이에서 동작한다.
 * JPA 내부에서 JDBC API를 사용하여 SQL을 호출해서 DB와 통신한다.
 
-### 용어
+
+### 엔티티 생명주기
+* 비영속(new/transient)
+  * 영속성 컨텍스트와 `Entity`간에 관계가 없는 상태
+    ```java
+    Member member = new Member();
+    member.setId("memberId");
+    member.setUsername("jbpark");
+    ```
+   
+* 영속(managed)
+  * `entityManager.persist()`
+    * `Entity`가 영속성 컨텍스트에 저장된 상태
+    * DB에는 저장되지 않는다.
+  * `transaction.commit()`
+    * 영속성 컨텍스트에 저장되어 있는 정보들을 DB로 전송한다.
+    ```java
+    Member member = new Member();
+    member.setId("memberId");
+    member.setUsername("jbpark");
+    
+    EntityManager entityManager = entityManagerFactory.createEntityManager();
+    entityManager.getTransaction().begin();
+    entityManager.persist(member);
+    ```
+
+* 준영속(detached)
+  * 영속성 컨텍스트에 저장된 엔티티가 분리된 상태
+    ```java
+    entityManager.detach(member);
+    ```
+
+* 삭제(removed)
+  * 실제 DB 삭제를 요청한 상태
+	```java
+	entityManager.remove(member);
+	```
+
+### 영속성 컨텍스트 사용 이점
+* 1차 캐시
+  * `Map<K, V>`의 형태로 저장된다.
+    * `K`: `@Id`로 선언한 필드 값(DB pk)
+    * `V`: 저장할 `Entity`
+  * DB에 접근하지 않고 캐시 정보에 먼저 접근한다.
+  * 성능상의 이점이 크진 않다.
+* 동일성 보장
+  * 영속 `Entity`의 동일성(Identity)을 보장한다.
+    * 하나의 트랜잭션 안에서 같은 `Entity`를 `==` 연산자로 비교가 가능하다.
+* 트랜잭션 쓰기 지연
+  * `Entity`를 등록할 때 쓰기 지연 SQL 저장소에 쿼리를 쌓는다.
+  * `entityManager.persist(member)`
+    1. 1차 캐시 저장
+    2. `insert`문 생성 (JPA가 Entity 분석)
+    3. `insert`문 `쓰기 지연 SQL 저장소`에 저장
+  * `transaction.commit()`
+    1. `flush()`: `쓰기 지연 SQL 저장소`에 쌓인 SQL들을 DB로 전송한다.
+       * `flush()`는 1차 캐시를 비우지 않는다.
+       * DB와 sync를 맞추는 역할을 한다.
+    2. `flush()` 후에 실제 DB 트랜잭션이 커밋된다.
+  * 버퍼링
+    * DB 쿼리 실행에 대한 옵션 설정 가능
+      * 성능 최적화 및 개선 가능
+    * jdbc 일괄 처리 옵션 (jdbc batch option)
+      * `commit()`전에 `insert`문의 사이즈 조절을 통해 한번에 처리할 수 있다.
+      * `persistence.xml`
+        * `<property name="hibernate.jdbc.batch_size" value=10/>`
+* 변경 감지
+  * `Entity`의 정보를 변경했을 경우 `update()`, `persist()` 없이도 정보 변경이 가능하다.
+  * 데이터 변경 후 `commit()`시 데이터를 비교하여 변경 사항을 감지하여 `update`문이 실행된다.
+  * 메커니즘
+    1. 영속성 컨텍스트에 값이 들어올 때 `snapshot`을 저장한다. (1차 캐시)
+    2. `transaction.commit()` 실행 후 `flush()` 단계에서 `Entity`와 `snapshot`을 비교한다.
+    3. 변경 사항이 있으면 `update`문을 생성 후 `쓰기 지연 SQL 저장소`에 저장한다.
+    4. `update`문을 실행한 후 `commit()`을 실행한다.
+  * 변경 감지로 생성되는 `update`문은 기본적으로 모든 필드를 업데이트한다.
+  * `@DynamicUpdate`를 통해 수정된 필드만 변경할 수 있다.
+    ```java
+    EntityManager entityManager = emf.createEntityManager();
+    EntityTransaction transaction = entityManager.getTransaction();
+    transaction.begin();
+    
+    Member member = entityManager.find(Member.class, "member");
+    member.setUsername("jbpark");
+    member.setAge(29);
+    
+    transaction.commit();
+    ```
+* 엔티티 삭제
+  * `transaction.commit()`시점에 `delete`문이 실행된다.
+	```java
+	Member member = entityManager.find(Member.class, "member");
+	entityManager.remove(member);
+	```
+
+### 용어 및 개념
 * `JPQL`
   * 테이블이 아닌 객체를 대상으로 검색하는 객체 지향 쿼리
   * SQL을 추상화해서 특정 데이터베이스 SQL에 의존 X
   * JPQL을 한 마디로 정의하면 객체 지향 SQL
 * `EntityManagerFactory`
-  * 애플리케이션에 생성 후 전체에서 공유
+  * 애플리케이션에 생성 후 전체에서 공유한다.
+  * 클라이언트 요청 시, `EntityManager`를 생성한다.
 * `EntityManager`
-  * 고객 요청당 1개씩 생성, 쓰레드간 공유 X
+  * 고객 요청당 1개씩 생성, 쓰레드간 공유해선 안된다.
+  * 내부적으로 DB Connection Pool을 사용해서 DB에 접근한다.
 * `EntityTransaction`
-  * JPA의 모든 데이터 변경은 트랜잭션 안에서 실행
+  * JPA의 모든 데이터 변경은 트랜잭션 안에서 실행해야 한다.
+  * 데이터 조회는 상관없다.
+* `Persistence Context`
+  * Entity를 영구적으로 저장하는 환경
+  * `EntityManager.persist(entity)`
+    * 실제 DB에 저장하는 것이 아닌 영속성 컨텍스트를 통해 `Entity`에 영속화하는 것이다.
+    * `persist()`시점에는 `Entity`를 영속성 컨텍스트에 저장하는 것이다.
 * 준영속 엔티티
   * 영속성 컨텍스트가 더는 관리하지 않는 엔티티를 말한다.
   * 수정 방법
     * 변경 감지 사용(*): 변경된 값만 업데이트
     * 병합 사용: 준영속 상태의 엔티티를 영속 상태의 엔티티로 변경하는 방식, 모든 필드가 변경되어서 `null` 값이 들어갈 수 있다.
 
-### 어노테이션
+
+
+### 애노테이션
 * `@Id`
   * 설정 프로퍼티가 테이블의 기본 키(Pk) 역할
 	* getter에 설정 가능
@@ -96,11 +201,11 @@
 * `@Enumerated(EnumType.XXX)`
   * default ORDINAL, 숫자: 중간에 새로운 유형 추가가 되면 문제가 생김 -> 반드시 STRING으로 사용
 * `@PersistanceContext`
-  * EntityManager를 빈으로 주입할 때 사용
-  * 스프링 부트에서는 @Autowired 로 주입 가능. (스프링도 차후 지원 예정)
+  * `EntityManager`를 빈으로 주입할 때 사용
+  * 스프링 부트에서는 `@Autowired` 로 주입 가능. (스프링도 차후 지원 예정)
   * 싱글톤 동시성 이슈 방지
-	* 스프링 컨테이너가 초기화되면서 @PersistenceContext로 주입 받은 EntityManager를 Proxy로 감싼다.
-	* EntityManager 호출 마다 Proxy를 통해 EntityManager를 생성하여 Thread-safe를 보장한다.
+    * 스프링 컨테이너가 초기화되면서 `@PersistenceContext`로 주입 받은 `EntityManager`를 Proxy로 감싼다.
+    * `EntityManager` 호출 마다 Proxy를 통해 `EntityManager`를 생성하여 Thread-safe를 보장한다.
 * `@RequiredArgsConstructor`
   * final이나 @NonNull인 필드 값만 파라미터로 받는 생성자 만듦
 * `@NoArgsConstructor`
