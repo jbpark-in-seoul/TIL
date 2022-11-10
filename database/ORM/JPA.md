@@ -132,7 +132,7 @@
 * `EntityTransaction`
   * JPA의 모든 데이터 변경은 트랜잭션 안에서 실행해야 한다.
   * 데이터 조회는 상관없다.
-* `Persistence Context`
+* `PersistenceContext`
   * Entity를 영구적으로 저장하는 환경
   * `EntityManager.persist(entity)`
     * 실제 DB에 저장하는 것이 아닌 영속성 컨텍스트를 통해 `Entity`에 영속화하는 것이다.
@@ -184,10 +184,10 @@
 	  * 두 테이블에 대한 외래키를 갖는 테이블이 연관 관계의 주인
 	  * 연관 관계 주인만이 외래 키 관리(등록, 수정, 삭제)가 가능하고, 주인이 아닌 엔티티는 읽기만 가능
 	* 속성
-	  * fetch: @ManyToOne(fetch = Fectch.XXX)   
+	  * fetch: @ManyToOne(fetch = Fetch.XXX)   
 		* XXX: EAGER(즉시), LAZY(지연)   
 		* XToOne 기본 값 -> EAGER, XToMany 기본 값 -> Lazy   
-	  * cascade: @ManyToOne(fetch = Fectch.LAZY, cascade = CascadeType.XXX)   
+	  * cascade: @ManyToOne(fetch = Fetch.LAZY, cascade = CascadeType.XXX)   
 		* XXX: ALL, PERSIST, MERGE, REMOVE, REFRESH, DETACH
 		  1. ALL: 상위 엔티티에서 하위 엔티티로 모든 작업을 전파
 		  2. PERSIST: 하위 엔티티까지 영속성 전달 - Order Entity 저장 시, OrderItem Entity 도 저장
@@ -200,14 +200,14 @@
   * 외래 키를 매핑할 때 사용: @JoinColumn(name = "item_id")
 * `@Enumerated(EnumType.XXX)`
   * default ORDINAL, 숫자: 중간에 새로운 유형 추가가 되면 문제가 생김 -> 반드시 STRING으로 사용
-* `@PersistanceContext`
+* `@PersistenceContext`
   * `EntityManager`를 빈으로 주입할 때 사용
   * 스프링 부트에서는 `@Autowired` 로 주입 가능. (스프링도 차후 지원 예정)
   * 싱글톤 동시성 이슈 방지
     * 스프링 컨테이너가 초기화되면서 `@PersistenceContext`로 주입 받은 `EntityManager`를 Proxy로 감싼다.
     * `EntityManager` 호출 마다 Proxy를 통해 `EntityManager`를 생성하여 Thread-safe를 보장한다.
 * `@RequiredArgsConstructor`
-  * final이나 @NonNull인 필드 값만 파라미터로 받는 생성자 만듦
+  * `final`이나 `@NonNull`인 필드 값만 파라미터로 받는 생성자 만듦
 * `@NoArgsConstructor`
   * 파라미터가 없는 기본 생성자를 생성
 * `@AllArgsConstructor`
