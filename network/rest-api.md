@@ -1,6 +1,6 @@
 ## REST API(Representational State Transfer API)
 * `REST API`란, REST 아키텍처의 제약 조건을 준수하는 애플리케이션 프로그래밍 인터페이스를 말한다.
-* `REST`란 자원을 이름으로 구분하여 해당 자원의 상태를 주고 받는 모든 것을 의미합니다.
+* `REST`란 자원을 이름으로 구분하여 해당 자원의 상태를 주고 받는 모든 것을 의미한다.
   * `HTTP URI`를 통해 자원을 명시한다.
   * `HTTP Method`(Post, Get, Put, Delete, Patch)를 통해 자원을 CRUD 처리한다.
 
